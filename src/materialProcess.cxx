@@ -33,7 +33,7 @@
 #include <functional>
 #include <iterator>
 
-#include <boost/regex.hpp>
+#include <regex>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 
@@ -47,6 +47,7 @@
 #include "OutputLog.h"
 #include "support.h"
 #include "regexSupport.h"
+#include "regexBuild.h"
 #include "stringCombine.h"
 #include "doubleErr.h"
 #include "mathSupport.h"
@@ -205,8 +206,8 @@ materialProcess::processMaterialCards(std::istream& IX)
   ELog::RegMethod RegA("materialProcess","processMaterialCards");
 
 
-  boost::regex mCard("^\\s*m(\\d+)\\s+");
-  boost::regex nonCard("^\\s*[a-zA-Z]+");
+  std::string mCard("^\\s*m(\\d+)\\s+");
+  std::regex nonCard("^\\s*[a-zA-Z]+");
 
 
   std::string SLine=StrFunc::getLine(IX);

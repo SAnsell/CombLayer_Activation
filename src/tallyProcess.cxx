@@ -33,7 +33,7 @@
 #include <functional>
 #include <iterator>
 
-#include <boost/regex.hpp>
+#include <regex>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 
@@ -157,7 +157,7 @@ tallyProcess::find1Tally(std::istream& IX,int& tallyN,long int& nps)
   ELog::RegMethod RegA("tallyProcess","find1Tally");
 
   
-  boost::regex tallySearch("^1tally\\s+(\\d+)\\s+nps =\\s+(\\d+)");
+  std::regex tallySearch("^1tally\\s+(\\d+)\\s+nps =\\s+(\\d+)");
 
   
   std::vector<int> OutPts;
@@ -274,7 +274,7 @@ tallyProcess::readWorkEnergy(std::istream& IX,const long int npsFile,
   for(size_t index=0;index<cnt;index++)
     FluxWork[index].initX(0.0);
   
-  boost::regex tallySearch("^\\s+cell\\s+(\\d+)");
+  std::regex tallySearch("^\\s+cell\\s+(\\d+)");
   std::string SLine=StrFunc::getLine(IX);
   double energy;
   DError::doubleErr flux;

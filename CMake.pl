@@ -37,7 +37,7 @@ $gM->findSubSrcDir("");
 $gM->addDepUnit("activation",   ["src","attachComp","input","log","process",
 				 "geometry","glob","mersenne","monte",
 				 "src","xml","poly","support","md5",
-				 "fileSupport","work"]);
+				 "fileSupport","work","support"]);
 $gM->writeCMake();
 
 print "FINISH CMake.pl\n";

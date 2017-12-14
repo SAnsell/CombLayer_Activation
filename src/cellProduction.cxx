@@ -32,8 +32,8 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
+#include <regex>
 
-#include <boost/regex.hpp>
 #include <boost/format.hpp>
 
 #include "Exception.h"

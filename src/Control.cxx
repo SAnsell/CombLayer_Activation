@@ -32,9 +32,9 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
+#include <regex>
 
 #include <boost/format.hpp>
-#include <boost/regex.hpp>
 #include <boost/filesystem.hpp>
 #include <dirent.h>
 
@@ -47,6 +47,7 @@
 #include "RegMethod.h"
 #include "OutputLog.h"
 #include "support.h"
+#include "regexBuild.h"
 #include "regexSupport.h"
 #include "stringCombine.h"
 #include "doubleErr.h"
@@ -293,7 +294,8 @@ Control::addTallyCells(const std::string& fileName,const int tallyNumber)
   std::ifstream IX;
   IX.open(fileName.c_str());
 
-  boost::regex tallySearch("^f(\\d+):");
+  //  std::regex tallySearch("^f(\\d+):");
+  std::string tallySearch("^f(\\d+):");
   
   std::string SLine=StrFunc::getLine(IX);
   int tNum(0);

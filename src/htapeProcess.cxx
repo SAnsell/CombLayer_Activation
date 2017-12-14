@@ -32,8 +32,8 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
+#include <regex>
 
-#include <boost/regex.hpp>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 
@@ -48,6 +48,7 @@
 #include "support.h"
 #include "stringCombine.h"
 #include "regexSupport.h"
+#include "regexBuild.h"
 #include "doubleErr.h"
 #include "mathSupport.h"
 #include "cinderOption.h"
@@ -166,8 +167,8 @@ htapeProcess::readZaid(const size_t prodType,
   ELog::RegMethod RegA("htapeProcess","readZaid");
 
   // find : z = 12 n = 12  1.4d-4 0.3 
-  boost::regex zaidSearch("z =\\s*(\\d+)\\s*n =\\s*(\\d+)\\s+(\\S+)\\s+(\\S+)");
-  boost::regex midSearch("n =\\s*(\\d+)\\s+(\\S+)\\s+(\\S+)");
+  std::regex zaidSearch("z =\\s*(\\d+)\\s*n =\\s*(\\d+)\\s+(\\S+)\\s+(\\S+)");
+  std::regex midSearch("n =\\s*(\\d+)\\s+(\\S+)\\s+(\\S+)");
   std::string SLine=StrFunc::getLine(IX,512);
 
   int z(0);
@@ -218,9 +219,13 @@ htapeProcess::readHeader(const size_t prodType,std::istream& IX,
   ELog::RegMethod RegA("htapeProcess","readHeader");
 
   
-  boost::regex npsSearch("statistical degrees of freedom.*=\\s+(\\d+)");
-  boost::regex caseSearch("^1\\s+case no.\\s+(\\d+)");
-  boost::regex cellSearch("for cell:\\s*(\\d+)");
+  //  std::regex npsSearch("statistical degrees of freedom.*=\\s+(\\d+)");
+  //  std::regex caseSearch("^1\\s+case no.\\s+(\\d+)");
+  //  std::regex cellSearch("for cell:\\s*(\\d+)");
+
+  std::string npsSearch("statistical degrees of freedom.*=\\s+(\\d+)");
+  std::string caseSearch("^1\\s+case no.\\s+(\\d+)");
+  std::string cellSearch("for cell:\\s*(\\d+)");
 
   long int npsFile(0);
   int caseNum,cellNum;  
@@ -307,11 +312,11 @@ htapeProcess::procGas(CTYPE& prodMap)
   // followed by values + error
   //
 
-  boost::regex caseSearch("^1\\s+case no.\\s+(\\d+)");
-  boost::regex cellSearch("for cell:\\s*(\\d+)");
+  std::string caseSearch("^1\\s+case no.\\s+(\\d+)");
+  std::string cellSearch("for cell:\\s*(\\d+)");
 
-  boost::regex hydrogenSearch("^\\s+hydrogen\\s+deuterium");
-  boost::regex heliumSearch("^\\s+helium-3\\s+helium-4");
+  std::regex hydrogenSearch("^\\s+hydrogen\\s+deuterium");
+  std::regex heliumSearch("^\\s+helium-3\\s+helium-4");
   
   std::string SLine=StrFunc::getLine(IX,512);
   size_t statusFlag(0);
@@ -566,25 +571,21 @@ htapeProcess::writeSprods(const std::string& FName,
 
   boost::format FMT("%s%|69t|V= %9.3e");
   boost::format CellFMT("%s%d%|70t|%9.3e %9.3e");
+
+  CTYPE::const_iterator mc=cellProd.find(cellN);
+  if (mc==cellProd.end())
+    throw ColErr::InContainerError<int>(cellN,"cellN in cellProd");
+  
+  const DError::doubleErr Total=mc->second.getTotal();
   
   if (FName.empty()) return;
   std::ofstream OX(FName.c_str());
-
-  CTYPE::const_iterator mc=cellProd.find(cellN);
   
-  if (mc==cellProd.end())
-    {
-      ELog::EM<<"Warning no cell:"<<cellN<<ELog::endWarn;
-    }
-  else
-    {
-      const DError::doubleErr Total=mc->second.getTotal();
-      OX<<(FMT % "distribution of residual nuclei" % Vol)
-	<<std::endl;
-      OX<<(CellFMT % "in cells " % cellN % Total.getVal() % Total.getErr())
-	<<std::endl;
-    }
-      
+  OX<<(FMT % "distribution of residual nuclei" % Vol)
+    <<std::endl;
+  OX<<(CellFMT % "in cells " % cellN % Total.getVal() % Total.getErr())
+    <<std::endl;
+  
   mc->second.writeSprods(OX);
   OX.close();
   return;

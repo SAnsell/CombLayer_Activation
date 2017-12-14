@@ -13,12 +13,16 @@ sub new
     bcomp => "clang",
     ccomp => "clang",
     cflag => "-fPIC -Wconversion -W -Wall -Wextra -Wno-comment -fexceptions -std=c++11",
+    boostLib => "-L/opt/local/lib ",
     
     masterProg => undef,
+    definitions => undef,
     depLists => undef,
     optimise => "",
+    gtk => 0,
     debug => "",
-
+    noregex => 0,
+    
     incLib => undef,           ## Array of all our includes used
     srcDir => undef,           ## Array of all our cxx directories
     incDir => undef            ## Array of all our includes used
@@ -26,6 +30,7 @@ sub new
   
   bless $self,$class;
   $self->{masterProg}=[ ];
+  $self->{definitions}=[ ];
   $self->{incDir}=[ ];
   $self->{srcDir}={ };
   
@@ -188,15 +193,19 @@ sub setParameters
       foreach my $Ostr (@Flags)
         {
 	  $self->{optimise}.=" -O2 " if ($Ostr eq "-O");
+	  push(@{$self->{definitions}},"NO_REGEX") if ($Ostr eq "-NR");
+	  $self->{noregex}=1 if ($Ostr eq "-NR");
 	  $self->{optimise}.=" -pg " if ($Ostr eq "-p"); ## Gprof
 	  $self->{gcov}=1 if ($Ostr eq "-C");
+	  $self->{gtk}=1 if ($Ostr eq "-gtk");
 	  $self->{debug}="" if ($Ostr eq "-g");
 	  $self->{bcomp}=$1 if ($Ostr=~/-gcc=(.*)/);
 	  $self->{ccomp}=$1 if ($Ostr=~/-g\+\+=(.*)/);
 	  $self->{cxx11}="" if ($Ostr=~/-std/);
+	  
 	}
     }
-  $self->{gsl}*=$nogsl;
+#  $self->{gsl}*=$nogsl;
 
   print STDERR "INIT Opt=",$self->{optimise},"\n";
   print STDERR "INIT Deb=",$self->{debug},"\n";
@@ -217,24 +226,38 @@ sub writeHeader
   my $self=shift;
   my $DX=shift;   ## FILEGLOB
 
-  print $DX "cmake_minimum_required(VERSION 3.2)\n\n";
+  print $DX "cmake_minimum_required(VERSION 2.8)\n\n";
 
   
   print $DX "set(CMAKE_CXX_COMPILER ",$self->{ccomp},")\n";
-  print $DX "add_definitions(",$self->{cflag},")\n";
-
-
-
-  print $DX "add_definitions(",$self->{optimise},")\n"
-      if ($self->{optimise});
-  print $DX "add_definitions(",$self->{debug},")\n"
-      if ($self->{debug});
-
-
-  print $DX "set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ./lib)\n";
+  print $DX "set(CMAKE_CXX_FLAGS \"",$self->{cflag}.$self->{optimise}.$self->{debug},"\")\n";
+  print $DX "set(CMAKE_CXX_RELEASE_FLAGS \"",$self->{cflag}." -O2 ".$self->{debug},"\")\n";
   
-  print $DX "\n";
+  print $DX "set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ./lib)\n";
 
+  if ($self->{gtk})
+  {
+      print $DX "find_package(PkgConfig REQUIRED)\n";
+      print $DX "pkg_check_modules(GTK3 REQUIRED gtk+-3.0)\n";
+  }
+  
+  foreach my $item (@{$self->{definitions}})
+  {
+    print $DX "add_definitions(-D",$item,")\n";
+  }
+  print $DX "\n";
+  print $DX "if(\"\${CMAKE_CXX_COMPILER_ID}\" STREQUAL \"Clang\")\n";
+  print $DX "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"";
+  print $DX "\${CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS} ";
+  print $DX "-undefined dynamic_lookup\")\n";
+  print $DX "endif()\n";
+
+  print $DX "if(\"\${CMAKE_CXX_COMPILER_ID}\" STREQUAL \"GNU\")\n";
+  print $DX "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"";
+  print $DX "\${CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS} ";
+  print $DX "-Wl,--start-group\")\n";
+  print $DX "endif()\n";
+  
   return;
 }
  
@@ -244,6 +267,8 @@ sub writeIncludes
   my $self=shift;
   my $DX=shift;
 
+  print $DX "include_directories(\${GTK3_INCLUDE_DIRS})\n" if ($self->{gtk});
+      
   foreach my $item (@{$self->{incDir}})
     {
       print $DX "include_directories(\"\${PROJECT_SOURCE_DIR}/";
@@ -265,10 +290,9 @@ sub writeGLOB
   {
       my $val=$self->{srcDir}{$item};
       
-    print $DX "file(GLOB ",$item," \"\${PROJECT_SOURCE_DIR}\/",
-    $val."\/\*.cxx\")\n";
-    print $DX "add_library(lib".$item." SHARED \$\{".$item."\})\n";
-
+      print $DX "file(GLOB ",$item," \"\${PROJECT_SOURCE_DIR}\/",
+      $val."\/\*.cxx\")\n";
+      print $DX "add_library(lib".$item." SHARED \$\{".$item."\})\n";
   }
   print $DX "## END GLOBS \n\n";
 
@@ -292,10 +316,14 @@ sub writeExcutables
         {
 	  print $DX "target_link_libraries(",$item,"  lib",$dItem,")\n";
         }
-      print $DX "target_link_libraries(",$item," boost_regex)\n";
-      print $DX "target_link_libraries(",$item," boost_filesystem)\n";
-      print $DX "target_link_libraries(",$item," stdc++)\n ";
+      if (!$self->{noregex})
+        {
+#          print $DX "target_link_libraries(",$item," boost_regex)\n";
+          print $DX "target_link_libraries(",$item," boost_filesystem)\n";
+	}
+      print $DX "target_link_libraries(",$item," stdc++)\n";
       print $DX "target_link_libraries(",$item," gsl)\n";
+      print $DX "target_link_libraries(",$item," gslcblas)\n";
       print $DX "target_link_libraries(",$item," m)\n";
     }
   
@@ -312,9 +340,58 @@ sub writeTail
 
   my $pdir=`pwd`;
   $pdir=$1 if ($pdir=~/.*\/(.*)/);
+
+  print $DX "set(ALLCXX \n";
+  foreach my $item (keys (%{$self->{srcDir}}))
+    {
+      my $val=$self->{srcDir}{$item};
+      print $DX "     \./",$val,"/*.cxx \n";
+    }
+  print $DX "     \./Main/*.cxx )\n";
+
+  print $DX "set(ALLHXX \n";
+  foreach my $item (@{$self->{incDir}})
+    {
+      print $DX "     \./",$item,"/*.h \n";
+    }
+  print $DX "      )\n";
+
+  print $DX "set(ASRC \${ALLHXX} \${ALLCXX} )\n";
   
-  my $tarString;
+## DOXYGEN
   
+  print $DX "add_custom_target(doxygen ".
+      " COMMAND ".
+      " { cat Doxyfile \\; echo \"INPUT=\" \${ASRC} \"\" \\;} | doxygen - )\n";
+
+## SLOC
+  
+  print $DX "add_custom_target(sloc ".
+      " COMMAND sloccount \${ASRC} )\n";
+
+## WORDS
+
+  my $wordString;  
+  print $DX "add_custom_target(words ",
+    " COMMAND grep -v -e \'^[[:space:][:cntrl:]]*\$\$\' \n";
+  foreach my $item (keys (%{$self->{srcDir}}))
+    {
+      ## Care here because we want local tar file
+      my $val=$self->{srcDir}{$item};
+      print $DX "     \./",$val,"/*.cxx \n";
+    }
+  foreach my $item (@{$self->{incDir}})
+    {
+      print $DX "     \./",$item,"/*.h \n";
+    }
+  print $DX "     \./Main/*.cxx \n";
+  print $DX "     \./CMake.pl  \n";
+  print $DX "     .//CMakeList.pm \n";
+  print $DX " | wc )\n";
+  print $DX "\n";
+
+    
+  my $tarString;  
   print $DX "add_custom_target(tar ",
     " COMMAND tar zcvf \${PROJECT_SOURCE_DIR}/",$pdir.".tgz \n";
 
